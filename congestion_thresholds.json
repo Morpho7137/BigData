@@ -1,0 +1,19 @@
+{
+  "raw_percentiles": {
+    "p25": 11.65,
+    "p50": 15.39,
+    "p75": 20.17
+  },
+  "severe_congestion": 11.65,
+  "heavy_congestion": 21.39,
+  "moderate_congestion": 26.17,
+  "free_flow": 26.17,
+  "statistics": {
+    "mean": 16.64,
+    "std": 7.16,
+    "min": 5.08,
+    "max": 82.13,
+    "sample_size": 564
+  },
+  "bias_offset": 6
+}
