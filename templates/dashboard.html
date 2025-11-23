@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beijing Traffic Congestion Dashboard</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        
+        #header {
+            background: #2a2a2a;
+            padding: 20px;
+            border-bottom: 2px solid #3a3a3a;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        #stats {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-bottom: 2px solid #3a3a3a;
+        }
+        
+        .stat-card {
+            flex: 1;
+            padding: 15px;
+            background: #333;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .stat-time {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        #map {
+            height: calc(100vh - 270px);
+            width: 100%;
+        }
+        
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .legend-item {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            color: #333;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 4px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        
+        #update-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            animation: pulse 1s infinite;
+            z-index: 1000;
+            display: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        #route-controls {
+            padding: 15px 20px;
+            background: #2a2a2a;
+            border-bottom: 2px solid #3a3a3a;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #666;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #555;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #da190b;
+        }
+        
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #e68900;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .checkbox-label:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .checkbox-label.active {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        #route-info {
+            flex-grow: 1;
+            text-align: right;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🚦 Beijing Traffic Congestion Dashboard</h1>
+        <p>Real-Time Road Network Monitoring with Route Planning</p>
+    </div>
+    
+    <div id="stats">
+        <div class="stat-card">
+            <div class="stat-label">Current Batch</div>
+            <div class="stat-value" id="batch-num">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">📅 Time Window</div>
+            <div class="stat-time" id="time-window">--</div>
+        </div>
+        <div class="stat-card" style="background: #00ff0033;">
+            <div class="stat-label">🟢 Free Flow</div>
+            <div class="stat-value" id="free-flow">0</div>
+        </div>
+        <div class="stat-card" style="background: #ffff0033;">
+            <div class="stat-label">🟡 Moderate</div>
+            <div class="stat-value" id="moderate">0</div>
+        </div>
+        <div class="stat-card" style="background: #ff990033;">
+            <div class="stat-label">🟠 Heavy</div>
+            <div class="stat-value" id="heavy">0</div>
+        </div>
+        <div class="stat-card" style="background: #ff000033;">
+            <div class="stat-label">🔴 Severe</div>
+            <div class="stat-value" id="severe">0</div>
+        </div>
+    </div>
+    
+    <div id="route-controls">
+        <button class="btn btn-primary" id="btn-start-planning">🗺️ Start Route Planning</button>
+        
+        <div class="checkbox-group" id="point-selection" style="display: none;">
+            <label class="checkbox-label" id="label-start">
+                <input type="checkbox" id="cb-set-start">
+                <span>📍 Set Start Point</span>
+            </label>
+            <label class="checkbox-label" id="label-dest">
+                <input type="checkbox" id="cb-set-destination">
+                <span>🎯 Set Destination</span>
+            </label>
+        </div>
+        
+        <button class="btn btn-primary" id="btn-calculate-route" style="display: none;" disabled>📍 Show Route</button>
+        <button class="btn btn-primary" id="btn-start-taxi" style="display: none;">🚕 Start Taxi</button>
+        <button class="btn btn-warning" id="btn-clear-route" style="display: none;">🗑️ Clear Route</button>
+        <button class="btn btn-secondary" id="btn-cancel" style="display: none;">❌ Cancel</button>
+        
+        <div id="route-info"></div>
+    </div>
+    
+    <div id="map"></div>
+    <div id="update-indicator">🔄 Updating...</div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // State
+        let routePlanningMode = false;
+        let taxiActive = false;
+        let clickMode = null;
+        let startPoint = null;
+        let destinationPoint = null;
+        let startMarker = null;
+        let destinationMarker = null;
+        let routeLayer = null;
+        let taxiMarker = null;
+        
+        // Initialize map
+        const map = L.map('map', {
+            center: [40.245, 116.464],
+            zoom: 10,
+            minZoom: 9,
+            maxZoom: 18,
+            maxBounds: [[39.44, 115.43], [41.05, 117.50]]
+        });
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Create congestion layer
+        let congestionLayer = L.layerGroup().addTo(map);
+        
+        // Color mapping
+        const colors = {
+            'FREE_FLOW': '#00ff00',
+            'MODERATE': '#ffff00',
+            'HEAVY': '#ff9900',
+            'SEVERE': '#ff0000'
+        };
+        
+        // Add legend
+        const legend = L.control({position: 'topright'});
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <div class="legend-title">Congestion Level</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00ff00;"></div>
+                    Free Flow (≥26 km/h)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffff00;"></div>
+                    Moderate (21-26 km/h)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff9900;"></div>
+                    Heavy (11-21 km/h)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff0000;"></div>
+                    Severe (<11 km/h)
+                </div>
+                <div class="legend-item" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ccc;">
+                    <div class="legend-color" style="background: #9933ff;"></div>
+                    Planned Route
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+        
+        // Button handlers
+        document.getElementById('btn-start-planning').onclick = function() {
+            routePlanningMode = true;
+            this.style.display = 'none';
+            document.getElementById('point-selection').style.display = 'flex';
+            document.getElementById('btn-calculate-route').style.display = 'inline-block';
+            document.getElementById('btn-cancel').style.display = 'inline-block';
+            document.getElementById('route-info').textContent = 'Select checkboxes then click map';
+        };
+        
+        document.getElementById('btn-cancel').onclick = function() {
+            resetRouteMode();
+        };
+        
+        document.getElementById('cb-set-start').onchange = function() {
+            if (this.checked) {
+                document.getElementById('cb-set-destination').checked = false;
+                document.getElementById('label-start').classList.add('active');
+                document.getElementById('label-dest').classList.remove('active');
+                clickMode = 'start';
+                document.getElementById('route-info').textContent = '🟢 Click map to set START point';
+            } else {
+                document.getElementById('label-start').classList.remove('active');
+                clickMode = null;
+            }
+        };
+        
+        document.getElementById('cb-set-destination').onchange = function() {
+            if (this.checked) {
+                document.getElementById('cb-set-start').checked = false;
+                document.getElementById('label-dest').classList.add('active');
+                document.getElementById('label-start').classList.remove('active');
+                clickMode = 'destination';
+                document.getElementById('route-info').textContent = '🔴 Click map to set DESTINATION';
+            } else {
+                document.getElementById('label-dest').classList.remove('active');
+                clickMode = null;
+            }
+        };
+        
+        document.getElementById('btn-calculate-route').onclick = async function() {
+            if (!startPoint || !destinationPoint) return;
+            
+            this.disabled = true;
+            document.getElementById('route-info').textContent = 'Calculating route...';
+            
+            try {
+                const response = await fetch('/api/calculate-route', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        start: startPoint,
+                        destination: destinationPoint
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show route on map
+                    if (routeLayer) map.removeLayer(routeLayer);
+                    routeLayer = L.geoJSON(result.route, {
+                        style: {
+                            color: '#9933ff',
+                            weight: 8,
+                            opacity: 0.9
+                        }
+                    }).addTo(map);
+                    
+                    document.getElementById('route-info').textContent = `Route: ${result.route_length} segments`;
+                    document.getElementById('btn-calculate-route').style.display = 'none';
+                    document.getElementById('btn-start-taxi').style.display = 'inline-block';
+                    document.getElementById('btn-clear-route').style.display = 'inline-block';
+                    this.disabled = false;
+                } else {
+                    alert('No route found!');
+                    this.disabled = false;
+                }
+            } catch (error) {
+                alert('Error calculating route');
+                this.disabled = false;
+            }
+        };
+        
+        document.getElementById('btn-start-taxi').onclick = async function() {
+            if (!startPoint || !destinationPoint) return;
+            
+            const currentText = this.textContent;
+            
+            if (currentText === '🚕 Start Taxi') {
+                // Start taxi
+                const response = await fetch('/api/toggle-taxi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: 'start',
+                        start: startPoint,
+                        destination: destinationPoint
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    taxiActive = true;
+                    this.textContent = '⏹ Stop Taxi';
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-danger');
+                    document.getElementById('point-selection').style.display = 'none';
+                    document.getElementById('btn-cancel').style.display = 'none';
+                    document.getElementById('btn-clear-route').style.display = 'none';
+                    console.log('Taxi started');
+                }
+            } else {
+                // Stop taxi
+                await fetch('/api/toggle-taxi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'stop'})
+                });
+                
+                taxiActive = false;
+                
+                // Reset button but KEEP route visible
+                this.textContent = '🚕 Start Taxi';
+                this.classList.remove('btn-danger');
+                this.classList.add('btn-primary');
+                document.getElementById('btn-clear-route').style.display = 'inline-block';
+                
+                // Remove taxi marker but KEEP route
+                if (taxiMarker) {
+                    map.removeLayer(taxiMarker);
+                    taxiMarker = null;
+                }
+                
+                document.getElementById('route-info').textContent = 'Taxi stopped';
+                console.log('Taxi stopped');
+            }
+        };
+        
+        document.getElementById('btn-clear-route').onclick = function() {
+            // Clear route but keep start/destination markers
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+                routeLayer = null;
+            }
+            if (taxiMarker) {
+                map.removeLayer(taxiMarker);
+                taxiMarker = null;
+            }
+            
+            taxiActive = false;
+            
+            // Re-enable point selection
+            routePlanningMode = true;
+            document.getElementById('point-selection').style.display = 'flex';
+            
+            // Reset buttons
+            document.getElementById('btn-calculate-route').style.display = 'inline-block';
+            document.getElementById('btn-calculate-route').disabled = false;
+            document.getElementById('btn-start-taxi').style.display = 'none';
+            document.getElementById('btn-start-taxi').textContent = '🚕 Start Taxi';
+            document.getElementById('btn-start-taxi').classList.remove('btn-danger');
+            document.getElementById('btn-start-taxi').classList.add('btn-primary');
+            document.getElementById('btn-clear-route').style.display = 'none';
+            document.getElementById('btn-cancel').style.display = 'inline-block';
+            
+            document.getElementById('route-info').textContent = 'Route cleared - select new points or recalculate';
+        };
+        
+        // Map click handler
+        map.on('click', async function(e) {
+            if (!clickMode) return;
+            
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+            
+            console.log(`Map clicked in ${clickMode} mode at:`, lat, lon);
+            
+            // Find nearest segment
+            const response = await fetch('/api/find-segment', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat, lon})
+            });
+            
+            const segment = await response.json();
+            
+            if (segment.error) {
+                alert('No road segment found at this location');
+                return;
+            }
+            
+            if (clickMode === 'start') {
+                startPoint = segment;
+                if (startMarker) map.removeLayer(startMarker);
+                startMarker = L.marker([segment.lat, segment.lon], {
+                    icon: L.divIcon({
+                        html: '<div style="background: #4CAF50; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px;"></div>',
+                        iconSize: [20, 20],
+                        className: ''
+                    })
+                }).addTo(map).bindPopup(`<b>START</b><br>${segment.road_name}`).openPopup();
+                
+                // Uncheck and clear mode
+                document.getElementById('cb-set-start').checked = false;
+                document.getElementById('label-start').classList.remove('active');
+                clickMode = null;
+                
+                document.getElementById('route-info').textContent = `Start: ${segment.road_name}`;
+                console.log('Start point set:', startPoint);
+                
+            } else if (clickMode === 'destination') {
+                destinationPoint = segment;
+                if (destinationMarker) map.removeLayer(destinationMarker);
+                destinationMarker = L.marker([segment.lat, segment.lon], {
+                    icon: L.divIcon({
+                        html: '<div style="background: #f44336; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px;"></div>',
+                        iconSize: [20, 20],
+                        className: ''
+                    })
+                }).addTo(map).bindPopup(`<b>DESTINATION</b><br>${segment.road_name}`).openPopup();
+                
+                // Uncheck and clear mode
+                document.getElementById('cb-set-destination').checked = false;
+                document.getElementById('label-dest').classList.remove('active');
+                clickMode = null;
+                
+                document.getElementById('route-info').textContent = `Destination: ${segment.road_name}`;
+                console.log('Destination point set:', destinationPoint);
+            }
+            
+            // Enable "Show Route" button if both points are set
+            if (startPoint && destinationPoint) {
+                document.getElementById('btn-calculate-route').disabled = false;
+                document.getElementById('route-info').textContent = 'Both points set - click "Show Route"';
+            }
+        });
+        
+        function resetRouteMode() {
+            routePlanningMode = false;
+            taxiActive = false;
+            clickMode = null;
+            startPoint = null;
+            destinationPoint = null;
+            
+            if (startMarker) map.removeLayer(startMarker);
+            if (destinationMarker) map.removeLayer(destinationMarker);
+            if (routeLayer) map.removeLayer(routeLayer);
+            if (taxiMarker) map.removeLayer(taxiMarker);
+            
+            startMarker = null;
+            destinationMarker = null;
+            routeLayer = null;
+            taxiMarker = null;
+            
+            document.getElementById('btn-start-planning').style.display = 'inline-block';
+            document.getElementById('point-selection').style.display = 'none';
+            document.getElementById('btn-calculate-route').style.display = 'none';
+            document.getElementById('btn-start-taxi').style.display = 'none';
+            document.getElementById('btn-start-taxi').textContent = '🚕 Start Taxi';
+            document.getElementById('btn-start-taxi').classList.remove('btn-danger');
+            document.getElementById('btn-start-taxi').classList.add('btn-primary');
+            document.getElementById('btn-clear-route').style.display = 'none';
+            document.getElementById('btn-cancel').style.display = 'none';
+            document.getElementById('cb-set-start').checked = false;
+            document.getElementById('cb-set-destination').checked = false;
+            document.getElementById('label-start').classList.remove('active');
+            document.getElementById('label-dest').classList.remove('active');
+            document.getElementById('route-info').textContent = '';
+            document.getElementById('btn-calculate-route').disabled = false;
+        }
+        
+        function formatTime(timestamp) {
+            if (!timestamp) return '--';
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        async function updateCongestion() {
+            const indicator = document.getElementById('update-indicator');
+            indicator.style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/congestion');
+                const data = await response.json();
+                
+                // Clear old congestion layer (but NOT route layer)
+                congestionLayer.clearLayers();
+                
+                // Add new congestion data
+                L.geoJSON(data.geojson, {
+                    style: function(feature) {
+                        return {
+                            color: colors[feature.properties.congestion_level],
+                            weight: 6,
+                            opacity: 0.8
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const props = feature.properties;
+                        layer.bindTooltip(`
+                            <b>${props.road_name || 'Unknown'}</b><br>
+                            Type: ${props.road_type || 'N/A'}<br>
+                            Speed: ${props.avg_speed_kmh ? props.avg_speed_kmh.toFixed(1) : '0.0'} km/h<br>
+                            Level: ${props.congestion_level}
+                        `);
+                    }
+                }).addTo(congestionLayer);
+                
+                // Update stats
+                const stats = data.stats;
+                document.getElementById('batch-num').textContent = `#${stats.batch}`;
+                document.getElementById('free-flow').textContent = stats.free_flow;
+                document.getElementById('moderate').textContent = stats.moderate;
+                document.getElementById('heavy').textContent = stats.heavy;
+                document.getElementById('severe').textContent = stats.severe;
+                
+                if (stats.window_start) {
+                    document.getElementById('time-window').textContent = formatTime(stats.window_start);
+                }
+                
+                // Update taxi if active
+                if (taxiActive && data.taxi) {
+                    console.log('Taxi update:', data.taxi);
+                    
+                    // Update route (may have changed due to congestion)
+                    if (data.taxi.route) {
+                        if (routeLayer) map.removeLayer(routeLayer);
+                        routeLayer = L.geoJSON(data.taxi.route, {
+                            style: {
+                                color: '#9933ff',
+                                weight: 8,
+                                opacity: 0.9
+                            }
+                        }).addTo(map);
+                    }
+                    
+                    // Update taxi marker position
+                    if (data.taxi.position) {
+                        if (taxiMarker) map.removeLayer(taxiMarker);
+                        
+                        taxiMarker = L.marker([data.taxi.position.lat, data.taxi.position.lon], {
+                            icon: L.divIcon({
+                                html: `<div style="
+                                    background: #2196F3; 
+                                    border: 3px solid white; 
+                                    border-radius: 50%; 
+                                    width: 24px; 
+                                    height: 24px;
+                                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                "></div>`,
+                                iconSize: [24, 24],
+                                iconAnchor: [12, 12],
+                                className: ''
+                            })
+                        }).addTo(map);
+                        
+                        console.log('Taxi marker created at:', data.taxi.position);
+                    }
+                    
+                    // Update progress
+                    document.getElementById('route-info').textContent = `Taxi: ${data.taxi.progress}`;
+                    
+                    // Check if reached
+                    if (data.taxi.reached) {
+                        setTimeout(() => {
+                            alert('Taxi reached destination!');
+                            taxiActive = false;
+                            document.getElementById('btn-start-taxi').textContent = '🚕 Start Taxi';
+                            document.getElementById('btn-start-taxi').classList.remove('btn-danger');
+                            document.getElementById('btn-start-taxi').classList.add('btn-primary');
+                            document.getElementById('btn-clear-route').style.display = 'inline-block';
+                        }, 500);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error fetching congestion data:', error);
+            }
+            
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 500);
+        }
+        
+        // Initial load
+        updateCongestion();
+        
+        // Update every 30 seconds (match Spark batch interval)
+        setInterval(updateCongestion, 30000);
+    </script>
+</body>
+</html>
