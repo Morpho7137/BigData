@@ -115,12 +115,5 @@ http://localhost:5000`
 
 -----
 
-## 👨‍💻 Author
-
-**Nguyen Anh Kiet**
-
-  - **Email:** 23020383@vnu.edu.vn
-  - **Project:** Big Data Course - Major Project
-
 <!-- end list -->
 
