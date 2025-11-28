@@ -31,7 +31,6 @@ The main pipeline components.
 - `spark_streaming.py`: Consumes Kafka stream, performs map-matching, aggregates 5-min windows, classifies congestion, and writes to DB.
 - `adaptive_matcher.py`: Implements R-tree spatial indexing and Haversine distance for efficient map-matching.
 - `speed_calculator.py`: Utility for distance and speed computation using the Haversine formula.
-- `grid_aggregator.py`: Handles spatial-temporal binning (0.001° grid, 5-min windows).
 
 ### 3. Application & Visualization
 - `app.py`: Flask API server serving congestion data and A* routing endpoints.
@@ -72,7 +71,7 @@ The main pipeline components.
                                      |
                    +-----------------+-----------------+
                    |                 |                 |
-         adaptive_matcher.py  speed_calculator.py  grid_aggregator.py
+         adaptive_matcher.py                    speed_calculator.py  
                    |                 |                 |
                    +-----------------+-----------------+
                                      |
