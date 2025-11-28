@@ -91,20 +91,34 @@ The main pipeline components.
 
 ## ⚙️ System Architecture & Data Flow
 
-```mermaid
-graph TD
-    A[OSM & Raw GPS] -->|Pre-process| B(split_segments.py)
-    A -->|Pre-process| C(sort_gps_data.py)
-    C --> D[gps_producer.py]
-    D -->|Kafka Stream| E[spark_streaming.py]
-    B --> E
-    E --> F{Processing Modules}
-    F -->|Match| G[adaptive_matcher.py]
-    F -->|Calc| H[speed_calculator.py]
-    F -->|Bin| I[grid_aggregator.py]
-    E -->|Write| J[(PostgreSQL)]
-    J --> K[app.py / Flask API]
-    K --> L[dashboard.html]
+[OSM & Raw GPS Data]
+      |
+      +---> (Pre-process) ---> split_segments.py -------+
+      |                                                 |
+      +---> (Pre-process) ---> sort_gps_data.py         |
+                                     |                  |
+                                     v                  |
+                              gps_producer.py           |
+                                     |                  |
+                               (Kafka Stream)           |
+                                     |                  |
+                                     v                  v
+                              spark_streaming.py <------+
+                                     |
+                   +-----------------+-----------------+
+                   |                 |                 |
+         adaptive_matcher.py  speed_calculator.py  grid_aggregator.py
+                   |                 |                 |
+                   +-----------------+-----------------+
+                                     |
+                                     v
+                            [PostgreSQL Database]
+                                     |
+                                     v
+                             app.py (Flask API)
+                                     |
+                                     v
+                               dashboard.html
 
 -----
 
